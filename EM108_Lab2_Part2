@@ -1,0 +1,19 @@
+  int main()
+    {
+    	int number1, number2, number3, sum, product, average;
+        cout << "\n\n Hello! \n";
+        cout<<" Please enter your first number: "; 
+        cin>>number1;
+		cout<<" Please enter your second number: ";
+		cin>>number2;
+		cout<<" Please enter your third number: ";
+		cin>>number3;
+        sum=(number1+number2+number3);
+        cout<<" The sum of these three numbers is: "<< sum << endl;
+        product=(number1*number2*number3);
+        cout<<" The product of these three numbers are : " << product << endl;
+        average=(sum)/3;
+        cout<<" The average of these three numbers are: "<< average << endl;
+        cout<< endl;
+        return 0;
+    }
