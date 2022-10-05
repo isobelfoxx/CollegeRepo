@@ -1,0 +1,613 @@
+//Team ID: 975cd4ba
+#include <WiFi.h>
+#define BUFSIZE 512
+ 
+// Setting up the motor
+int motor1PWM = 39; // P2.6
+int motor1Phase = 40; // P2.7
+int motor2PWM = 37; // P5.6
+int motor2Phase = 38; // P2.4
+ 
+// Sensors pins definitions
+int Sensors[5] = {0, 0, 0, 0, 0};
+int AnalogPin[5] = {A13, A11, A5, A8, A6}; //Analog pins P4.0, P4.2, P5.0, P4.5, P4.7
+ 
+// wall sensor defintions
+int WallSensor = A3;
+int distance = 0;
+ 
+// LED sensor to read the line definition
+int lineLed = A14;
+ 
+// server details
+char server[] = "54.78.246.30";
+int port = 8081;
+ 
+// wifi details
+char ssid[] = "DCU-Guest-WiFi";
+WiFiClient client;
+ 
+// global variables
+int destination = 0;
+int position = -1;
+int lPosition = -1;
+ 
+// connect client to server
+bool connect()
+{
+  if (!client.connect(server, port))
+  {
+    Serial.println("error connecting to server");
+    return false;
+  }
+  Serial.println("connected to server");
+  return true;
+}
+ 
+// post the position
+int Post(int position)
+{
+  String postBody("position=");
+  postBody += position;
+  // send post request and headers
+  client.println("POST /api/arrived/975cd4ba HTTP/1.1");
+  client.println("Content-Type: application/x-www-form-urlencoded");
+  client.print("Content-Length: ");
+  client.println(postBody.length());
+  client.println("Connection: close");
+  client.println();
+  // send post body
+  client.println(postBody);
+}
+ 
+String readResponse()
+{
+  char buffer[BUFSIZE];
+  memset(buffer, 0, BUFSIZE);
+  client.readBytes(buffer, BUFSIZE);
+  String response(buffer);
+  return response;
+}
+ 
+int getStatusCode(String& response)
+{
+  String code = response.substring(9, 12);
+  return code.toInt();
+}
+ 
+String getResponseBody(String& response)
+{
+  int split = response.indexOf("\r\n\r\n");
+  String body = response.substring(split+4, response.length());
+  body.trim();
+  return body;
+}
+ 
+void connectToWiFi()
+{
+  Serial.print("---------------------------------\n");
+  Serial.print("Connecting to network: ");
+  Serial.print(ssid);
+  Serial.println();//  Serial.flush();
+  WiFi.begin(ssid);
+  //  WiFi.begin(ssid, password); //use this for NETGEAR
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.print(".");
+    Serial.flush();
+  }
+  Serial.println("Connected");
+  Serial.print("Obtaining IP address");
+  Serial.flush();
+  while (WiFi.localIP() == INADDR_NONE)
+  {
+    Serial.print(".");
+    Serial.flush();
+  }
+  Serial.println();
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+}
+ 
+int getDest(int position){
+  if(connect()){
+    Post(position);
+  }
+  // read response
+    String response = readResponse();
+    // get status code
+    int statusCode = getStatusCode(response);
+    if (statusCode == 200)
+    {
+      // success, read body
+      String body = getResponseBody(response);
+      // check if at final destination
+      if (!body.equals("undefined"))
+      {
+        destination = body.toInt();
+        Serial.print("Destination = ");
+        Serial.println(destination);
+ 
+      }
+    }
+    Serial.println(response);
+    Serial.println(" ");
+    client.stop();
+    Serial.print("---------------------------------\n");
+}
+ 
+///////////////////////////////////////////////////////// SETUP FUNCTION //////////////////////////////////////////////////////
+void setup()
+{
+  Serial.begin(9600);
+  connectToWiFi();
+  _OneToZero();
+}
+ 
+///////////////////////////////////////////////////////// LOOP FUNCTION ///////////////////////////////////////////////////////
+void loop()
+{
+  distance = analogRead(WallSensor);
+//  Serial.print("distance:");
+//  Serial.println(distance);
+}
+ 
+///////////////////////////////////////////////////////// ROUTES HARD CODED //////////////////////////////////////////////////
+// ROUTE: -1 to 0
+void _OneToZero() {
+  lineFollow();
+  lPosition = -1;
+  position = 0;
+  getDest(position); 
+}
+ 
+// ROUTE: 0 to 1
+void ZeroToOne() {
+  if (lPosition ==  -1 || lPosition == 4 )
+    lineFollow();  
+  else if (lPosition ==  1 || lPosition == 2 ){
+    reverse();
+    oneEighty( 1, 0, 0); // Right 180 turn
+  }
+  junction( 0, 1, 4); // Left junction turn
+  lPosition = 0;
+}
+ 
+// ROUTE: 0 to 2
+void ZeroToTwo() {
+  if (lPosition ==  -1 || lPosition == 4 ) 
+    lineFollow();
+  else if (lPosition ==  1 || lPosition == 2 ) {
+    reverse();
+    oneEighty( 0, 1, 4); // Left 180 turn
+  }
+  lineFollow();
+  lPosition = 0;
+}
+ 
+// ROUTE: 0 to 3
+void ZeroToThree() {
+  ZeroToTwo();
+  TwoToThree();
+  lPosition = 0;
+}
+ 
+// ROUTE: 0 to 4
+void ZeroToFour() {
+  if (lPosition ==  -1 || lPosition == 4 ) {
+    reverse();
+    oneEighty( 0, 1, 4); // Left 180 turn
+  }
+  else if (lPosition ==  1 || lPosition == 2 ) 
+    lineFollow();
+  lPosition = 0;
+}
+ 
+// ROUTE: 0 to 5
+void ZeroToFive() {
+  ZeroToOne();
+  OneToFive();
+} 
+ 
+// ROUTE: 1 to 0
+void OneToZero() {
+  if (lPosition ==  3 || lPosition == 4 ) 
+    lineFollow();
+  else if (lPosition ==  0 || lPosition == 2 ) {
+    reverse();
+    oneEighty( 0, 1, 4); // Left 180 turn
+  }
+  junction( 1, 0, 0); // Right junction turn
+  lPosition = 1;
+} 
+ 
+// ROUTE: 1 to 2
+void OneToTwo() {
+  if (lPosition ==  3 || lPosition == 4 ) 
+    lineFollow();
+  else if (lPosition == 0 || lPosition == 2 ) {
+    reverse();    
+    oneEighty( 0, 1, 4); // Left 180 turn
+  }
+  junction( 0, 1, 4); // Left junction turn
+  lPosition = 1;
+}
+ 
+// ROUTE: 1 to 3
+void OneToThree() {
+  if (lPosition ==  3 || lPosition == 4 ) 
+    lineFollow();
+  else if (lPosition ==  0 || lPosition == 2) {
+    reverse();
+    oneEighty( 0, 1, 4); // Left 180 turn
+  }
+  junction( 0, 1, 4); // Left junction turn
+  lineFollow();
+  lPosition = 1;
+}
+ 
+// ROUTE: 1 to 4
+void OneToFour() {
+  if (lPosition ==  3 || lPosition == 4) 
+    lineFollow();
+  else if (lPosition ==  0 || lPosition == 2 ) {
+    reverse();
+    oneEighty( 0, 1, 4); // Left 180 turn
+  }
+  junction( 1, 0, 0); // Right junction turn
+  lineFollow();
+  lPosition = 1;
+}
+ 
+// ROUTE: 1 to 5
+void OneToFive() {
+    wall();
+}
+ 
+// ROUTE: 2 to 0
+void TwoToZero() {
+  if (lPosition == 3 ) 
+    lineFollow();
+  else if (lPosition ==  0 || lPosition == 1 || lPosition == 4) {
+    reverse();
+    oneEighty( 0, 1, 4); // Left 180 turn
+  }
+  lineFollow();
+  lPosition = 2;
+}
+ 
+// ROUTE: 2 to 1
+void TwoToOne() {
+  if (lPosition == 3 ) 
+    lineFollow();
+  else if (lPosition ==  0 || lPosition == 1 || lPosition == 4) {
+    reverse();
+    oneEighty( 1, 0 ,0); // Right 180 turn
+  }
+  junction( 1, 0, 0); // Right junction turn
+  lPosition = 2;
+} 
+ 
+// ROUTE: 2 to 3
+void TwoToThree() {
+  if (lPosition == 3 ) {
+    reverse();
+    oneEighty( 1, 0, 0); // Right 180 turn
+  }
+  else if (lPosition ==  0 || lPosition == 1 || lPosition == 4) 
+    lineFollow();
+  lPosition = 2;
+}
+ 
+// ROUTE: 2 to 4
+void TwoToFour() {
+  TwoToZero();
+  ZeroToFour();
+}
+ 
+// ROUTE: 2 to 5
+void TwoToFive() {
+  TwoToOne();
+  OneToFive();
+}
+ 
+// ROUTE: 3 to 0
+void ThreeToZero () { 
+  ThreeToTwo();
+  TwoToZero();
+}
+ 
+// ROUTE: 3 to 1
+void ThreeToOne () {
+  ThreeToTwo();
+  TwoToOne();
+}
+ 
+// ROUTE: 3 to 2
+void ThreeToTwo () {
+  if ( lPosition ==  0 || lPosition == 1 || lPosition == 2 ) {
+    reverse();
+    oneEighty( 0, 1, 4 ); // Left 180 turn
+  }
+  else if ( lPosition == 4 ) 
+    lineFollow();
+  lPosition = 3;
+}
+ 
+// ROUTE: 3 to 4
+void ThreeToFour() {
+  if ( lPosition == 0 || lPosition == 1 || lPosition == 2 ) 
+    lineFollow();
+  else if ( lPosition == 4 ) {
+    reverse();
+   oneEighty( 1, 0, 0 ); // Right 180 turn
+  }
+  lineFollow();
+  lPosition = 3;
+}
+ 
+// ROUTE: 3 to 5
+void ThreeToFive() {
+  ThreeToTwo();
+  TwoToOne();
+  OneToFive();
+}
+ 
+// ROUTE: 4 to 0
+void FourToZero() {
+  if (lPosition == 0 || lPosition == 1 || lPosition == 2) {
+    reverse();
+    oneEighty( 1, 0, 0); // Right 180 turn
+  }
+  else if (lPosition == 3)
+    lineFollow();
+  lPosition = 3;
+}
+ 
+// ROUTE: 4 to 1
+void FourToOne() {
+  FourToZero();
+  ZeroToOne();
+}
+ 
+// ROUTE: 4 to 2
+void FourToTwo() {
+  FourToZero();
+  ZeroToTwo();
+}
+ 
+// ROUTE: 4 to 3
+void FourToThree() {
+  if (lPosition == 0 || lPosition == 1 || lPosition == 2)
+    lineFollow();
+  else if (lPosition == 3) {
+    reverse();
+    oneEighty( 0, 1, 4); // Left 180 turn
+  }
+  lineFollow();
+  lPosition = 4;
+}
+ 
+// ROUTE: 0 to 5
+void FourToFive() {
+  FourToZero();
+  ZeroToOne();
+  OneToFive();
+}
+void routes()
+{
+  if (position == 0 && destination == 1)
+    ZeroToOne();
+ 
+  if (position == 0 && destination == 2)
+    ZeroToTwo();
+ 
+  if (position == 0 && destination == 3)
+    ZeroToThree();
+ 
+  if (position == 0 && destination == 4)
+    ZeroToFour();
+ 
+  if (position == 1 && destination  == 0)
+    OneToZero();
+ 
+  if (position == 1 && destination  == 2)
+    OneToTwo();
+ 
+  if (position == 1 && destination  == 3)
+    OneToThree();
+ 
+  if (position == 1 && destination  == 4)
+    OneToFour();
+ 
+  if (position == 2 && destination  == 0)
+    TwoToZero();
+ 
+  if (position == 2 && destination  == 1)
+    TwoToOne();
+ 
+  if (position == 2 && destination  == 3)
+    TwoToThree();
+ 
+  if (position == 2 && destination  == 4)
+    TwoToFour();
+ 
+  if (position == 3 && destination == 0)
+    ThreeToZero();
+ 
+  if (position == 3 && destination == 1)
+    ThreeToOne();
+ 
+  if (position == 3 && destination == 2)
+    ThreeToTwo();
+ 
+  if (position == 3 && destination == 4)
+    ThreeToFour();
+ 
+  if (position == 4 && destination == 0)
+    FourToZero();
+ 
+  if (position == 4 && destination == 1)
+    FourToOne();
+ 
+  if (position == 4 && destination == 2)
+    FourToTwo();
+ 
+  if (position == 4 && destination == 3)
+    FourToThree();
+    
+  if (position == 0 && destination == 5)
+    ZeroToFive(); 
+     
+  if (position == 1 && destination == 5)
+    OneToFive(); 
+     
+  if (position == 2 && destination == 5)
+    TwoToFive(); 
+     
+  if (position == 3 && destination == 5)
+    ThreeToFive(); 
+     
+  if (position == 4 && destination == 5)
+    FourToFive();  
+ 
+  position = destination;
+  getDest(position);
+}
+ 
+/////////////////////////////////////////////////// CHECKS SENSOR FUNCTION //////////////////////////////////////////////////////////
+void checkSensors()
+{
+  for (int i = 0; i < 5;  i++)
+  {
+    Sensors[i] = analogRead(AnalogPin[i]);
+    Serial.print(Sensors[i]); // This prints the actual analog reading from the sensors
+    Serial.print("\t"); //tab over on screen
+    if (i == 4)
+    {
+      Serial.println(""); //carriage return
+      delay(50); // display new set of readings every 600ms
+    }
+  }
+}
+ 
+/////////////////////////////////////////////////////// LINEFOLLOW FUNCTION //////////////////////////////////////////////////////////
+void lineFollow()
+{
+  int driving  = 1;
+  String type;
+  int counter = 0;
+  
+  while (driving == 1) {
+    counter ++;
+    checkSensors();
+    
+    //Straight
+    if ( Sensors[0] > 600 && Sensors[1] > 600 && Sensors[2] < 200 && Sensors[3] > 600 && Sensors[4] > 600 )
+      drive(1, 140, 1, 140);
+      
+    //easyLeft
+    else if ( Sensors[0] > 600 && Sensors[1] > 600  && Sensors[3] < 200 && Sensors[4] > 600 ) {
+      drive(1, 80, 1, 110);
+      type = "easy left";
+    }
+      
+    //harshLeft
+    else if ( Sensors[0] > 600 && Sensors[1] > 600 && Sensors[2] > 600 && Sensors[3] > 600 && Sensors[4] < 200 ){
+      drive(0, 60, 1, 90);
+      type = "harsh left";
+    }
+ 
+    //SuperLeft
+    else if ( Sensors[0] > 600 && Sensors[1] > 600 && Sensors[2] > 600 && Sensors[3] < 200 && Sensors[4] < 200 )
+      drive(0, 80, 1, 110);
+      
+    //easyRight
+    else if ( Sensors[0] > 600 && Sensors[1] < 200 && Sensors[3] > 600 && Sensors[4] > 600 ){
+      drive(1, 110, 1, 80);
+      type = "easy right";
+    }
+ 
+    //harshRight
+    else if ( Sensors[0] < 200 && Sensors[1] > 600 && Sensors[2] > 600 && Sensors[3] > 600 && Sensors[4] > 600){
+      drive(1, 90, 0, 60);
+      type = "harsh right";
+    }
+    
+    //superRight
+    else if ( Sensors[0] < 200 && Sensors[1] < 200 && Sensors[2] > 600 && Sensors[3] > 600 && Sensors[4] > 600 )
+      drive(1, 110, 0, 80);
+ 
+    //Stop
+    else if ( Sensors[1] < 200 && Sensors[2] < 200 && Sensors[3] < 200 && counter != 1 )
+    {
+      if( type == "easy left" )
+           drive(1, 110, 1, 80);   // easy right
+      if( type == "easy right" )
+           drive(1, 80, 1, 110);  // easy left
+      if( type == "harsh right" )
+         drive(0, 60, 1, 90); // harsh left
+      if( type == "harsh left" )
+         drive(1, 90, 0, 60); // harsh right
+      delay(50);
+      drive(1, 145, 1, 145); // straight
+      // LED lights up when the line sees a junction
+      digitalWrite(lineLed, HIGH);
+      delay(100);
+      digitalWrite(lineLed, LOW);
+      driving = 0;
+    }
+  }
+  //Stop
+  drive(1, 0, 1, 0);
+}
+ 
+///////////////////////////////////////////////////DISTANCE SENSOR FUNCTION/////////////////////////////////////////////////////////
+void wall (){
+  int wall = 0;
+  while ( wall == 0) {   
+      drive(1, 100, 1, 100);
+      if(distance > 700)
+        wall = 1;
+  }
+  // Stop
+  drive(1, 0, 1, 0);
+}
+ 
+/////////////////////////////////////////////////////DIRECTION FUNCTIONS/////////////////////////////////////////////////////////
+void drive(int p1, int v1, int p2, int v2){
+    digitalWrite(motor1Phase, p1); //motor 1
+    analogWrite(motor1PWM, v1); // set speed of motor
+    digitalWrite(motor2Phase, p2); //motor 2
+    analogWrite(motor2PWM, v2); // set speed of motor
+}
+void reverse() {
+  drive(0, 150, 0, 150);
+  delay(800);
+  //Stop
+  drive(1, 0, 1, 0);
+}
+void junction(int p1, int p2, int s){
+  int driving = 1;
+  while (driving == 1) {
+    checkSensors();
+    // Turn 90 degrees
+    drive(p1, 85, p2, 85);
+    if ( Sensors[s] < 200 )
+      driving = 0;
+  }
+  lineFollow();
+}
+void oneEighty(int p1, int p2, int s){
+  int driving = 1;
+  while (driving == 1) {
+    checkSensors();
+    // Turn 180 degrees
+    drive(p1, 110, p2, 110);
+    if ( Sensors[s] < 200 ) 
+      driving = 0;
+      // Stop
+      drive(p1, 0, p2, 0);
+  }
+  lineFollow();
+}
