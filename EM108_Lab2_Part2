@@ -1,19 +1,28 @@
-  int main()
-    {
-    	int number1, number2, number3, sum, product, average;
-        cout << "\n\n Hello! \n";
-        cout<<" Please enter your first number: "; 
-        cin>>number1;
-		cout<<" Please enter your second number: ";
-		cin>>number2;
-		cout<<" Please enter your third number: ";
-		cin>>number3;
-        sum=(number1+number2+number3);
-        cout<<" The sum of these three numbers is: "<< sum << endl;
-        product=(number1*number2*number3);
-        cout<<" The product of these three numbers are : " << product << endl;
-        average=(sum)/3;
-        cout<<" The average of these three numbers are: "<< average << endl;
-        cout<< endl;
-        return 0;
-    }
+#include <stdio.h>
+int
+main ()
+{
+  //Pattern is printed
+  printf ("*\n**\n***\n****\n*****\n");
+  return 0;
+}
+
+Square
+#include <stdio.h>
+int 
+main() 
+{
+  //Square is printed
+  printf("IIIIIIII\nIIIIIIII\nIIIIIIII\nIIIIIIII\n");
+  return 0;
+}
+
+Diamond
+#include <stdio.h>
+int 
+main() 
+{
+  //Diamond is printed
+  printf("    I    \n   III  \n  IIIII    \n IIIIIII\n  IIIII\n   III\n    I\n");
+  return 0;
+}
