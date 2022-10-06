@@ -1,9 +1,3 @@
-//Question 7
-Q. const string& s - this means pass by reference to const to a string where the contents of the string won’t be altered
-const char& c - means pass by reference to const to a character where the contents of the character won’t be altered.
-
-The reference is an alias which is passed for the original object. 
-
 #include <iostream>
 
 using namespace std;
